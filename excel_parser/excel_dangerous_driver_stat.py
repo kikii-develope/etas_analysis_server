@@ -8,18 +8,20 @@ from sql.queries import fetch_driver_data, insert_query
 
 def upload_etas_dangerous_driver_stats(df: pd.DataFrame, conn, companyId: int, yearMonth: str):
     # 병합 해제 코드
-    df.iloc[0] = df.iloc[0].ffill()
-    formatted_date = datetime.strptime(yearMonth, "%Y-%m").date()
+    df.iloc[0] = df.iloc[0].ffill().astype(object)
     
     df.columns = [f"{str(main).strip()}{str(sub).strip()}" if pd.notna(sub) else str(main).strip() for main, sub in zip(df.iloc[0], df.iloc[1])]
+        
     df[["이름","코드"]] = df["운전자"].str.extract(r"(.+)\((.+)\)")
     df.drop(columns=["운전자"], inplace=True)
     df = df[["이름", "코드"] + [col for col in df.columns if col not in ["이름", "코드"]]]
     
     driver_df = fetch_driver_data(cursor=conn.cursor(), company_id=companyId)
-
-    df.columns = df.columns.map(lambda x: re.sub(r"\s*\([^)]*\)\s*", "", x).strip())
+    df.columns = df.columns.map(
+        lambda x: re.sub(r"[\s\n\r]", "", re.sub(r"\s*\([^)]*\)\s*", "", x))
+    )
     
+    print("columns!!")
     print(df.columns)
     
     for _, row in df.iterrows():
@@ -35,13 +37,13 @@ def upload_etas_dangerous_driver_stats(df: pd.DataFrame, conn, companyId: int, y
                                  "sharp_turn_left", "sharp_turn_right", "sharp_uturn", 
                                  "sudden_overtake", "sudden_lane_change", "driving_days", 
                                  "driving_distance", "driving_time")
-            conn.cursor().execute(query, (driver_primary_id, formatted_date, row["위험수준"],
-                                          row["주요위험운전행동"], row["최대연속운전"], row["100km당위험운전행동합계"],
-                                          row["과속건수"], row["과속시간"], row["장기과속건수"], row["장기과속시간"],
-                                          row["급가속"], row["급출발"], row["급감속"], row["급정지"],
-                                          row["급회전좌회전"], row["급회전우회전"], row["급회전U턴"],
-                                          row["급앞지르기"], row["급진로변경"], row["운행정보일수"],
-                                          row["운행정보거리"], row["운행정보시간"]))
+            conn.cursor().execute(query, (driver_primary_id, yearMonth, row.get("위험수준", None),
+                                          row.get("주요위험운전행동", None), row.get("최대연속운전", None), row.get("100km당위험운전행동합계", None),
+                                          row.get("과속건수", None), row.get("과속시간", None), row.get("장기과속건수", None), row.get("장기과속시간", None),
+                                          row.get("급가속", None), row.get("급출발", None), row.get("급감속", None), row.get("급정지", None),
+                                          row.get("급회전좌회전", None), row.get("급회전우회전", None), row.get("급회전U턴", None),
+                                          row.get("급앞지르기", None), row.get("급진로변경", None), row.get("운행정보일수", None),
+                                          row.get("운행정보거리", None), row.get("운행정보시간", None)))
     
     conn.commit()
     conn.cursor().close()

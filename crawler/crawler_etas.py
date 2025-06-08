@@ -1,31 +1,59 @@
 
 import time
 
+from fastapi import HTTPException
 import pandas as pd
 import urllib
+from crawler.etas_company_info import ETAS_COMPANY_INFO
 from crawler.index import load_web_driver
 from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 driver = None
 
-def init_driver():
+def start_driver(user_data_dir: str = None):
     global driver
+    if driver is not None:
+        try:
+            driver.quit()
+        except Exception as e:
+            print(f"기존 드라이버 종료 중 에러: {e}")
+        driver = None
+    
+    driver = load_web_driver(user_data_dir)
+    print("new Driver Started")
+    return driver
+
+def init_driver():
+    print("init_driver run")
+    global driver
+    
+    print(driver)
     if driver is None:
-        driver = load_web_driver()
+        driver = start_driver()
+    return driver
+
+def get_driver():
+    global driver
+    if(driver is None):
+        raise HTTPException(status_code=401, detail="ETAS_LOGIN_REQUIRED")
     return driver
 
 def check_session_id(driver):
-    if driver is None:
+    try:
+        if driver is None:
+            return False
+        cookies = driver.get_cookies()
+        for cookie in cookies:
+            if cookie['name'] == 'JSESSIONID':
+                return True
         return False
-    cookies = driver.get_cookies()
-    for cookie in cookies:
-        if cookie['name'] == 'JSESSIONID':
-            return True
-    return False
+    except Exception as e:
+        print(e)
+        return False
 
 def wait_for_element(by, value, timeout=10):
     return WebDriverWait(driver, timeout).until(
@@ -34,9 +62,6 @@ def wait_for_element(by, value, timeout=10):
 
 async def login(id: str, password: str):
     driver = init_driver()
-    
-    if check_session_id(driver):
-        return driver
     
     driver.get("https://tsum.kotsa.or.kr/tsum/mbs/inqFrmLogin.do?mobileGubun=PC");
     
@@ -50,6 +75,7 @@ async def login(id: str, password: str):
             #2차 시도
             wait_for_element(By.ID, "id")
         except TimeoutException:
+            driver.quit()
             raise TimeoutException("로그인 페이지를 찾을 수 없습니다.")
     
     input_id = driver.find_element(By.ID, "id")
@@ -62,6 +88,7 @@ async def login(id: str, password: str):
     
     if not await find_is_login_symbol(driver):
         print("로그인에 실패했습니다. 다시 시도해주세요.", flush=True)
+        driver.quit()
         raise Exception("로그인에 실패했습니다.")
         
     return driver
@@ -118,8 +145,14 @@ def download_pdf_files(driver, driver_emp_no_list):
         
         driver.get(f'https://etas.kotsa.or.kr/etas/frtb0202/pop2/goNewView.do?searchYyyy=2024&searchMm=10&searchTranscoCd=00461&searchTranscoNm=%EB%B3%B4%EC%98%81%EC%9A%B4%EC%88%98(%EC%A3%BC)(%EA%B5%AC%EB%B6%80%EA%B0%95%EA%B5%90%ED%86%B5)&searchDrivrCd={second_encoding}')
         
+        time.sleep(5)
+        
+        print(driver.page_source)
+        
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "frmReport")))
+            
+            print("run here ?")
         except TimeoutException:
             print(f"Timeout:: {driver_emp_no}번 승무원 정보를 찾을 수 없습니다.", flush=True)
             continue
@@ -180,6 +213,100 @@ def download_pdf_files(driver, driver_emp_no_list):
                         break
                 break
             
+def download_pdf_file(driver, company_id, emp_no, year_month):
+    try:
+        first_encoding = urllib.parse.quote(emp_no)
+        second_encoding = urllib.parse.quote(first_encoding)
+        
+        search_transco_cd = ETAS_COMPANY_INFO[int(company_id)]['transCoCd']
+        search_transco_nm = ETAS_COMPANY_INFO[int(company_id)]['transCoNm']
+        year = year_month.split('-')[0]
+        month = year_month.split('-')[1]
+        driver_emp_no = emp_no
+        
+        search_transco_nm = urllib.parse.quote(search_transco_nm)
+        
+        driver = get_driver()
+        
+        print(driver)
+        
+        url = f'https://etas.kotsa.or.kr/etas/frtb0202/pop2/goNewView.do?searchYyyy={year}&searchMm={month}&searchTranscoCd={search_transco_cd}&searchTranscoNm={search_transco_nm}&searchDrivrCd={second_encoding}'
+        driver.execute_script(f"window.open('{url}', '_blank');")
+        time.sleep(5)
+        # driver.switch_to.window(driver.window_handles[1])
+        
+        frmElement = driver.find_element(By.ID, "frmReport")
+        
+        if frmElement is None:
+            driver.close()
+            raise Exception(f"Timeout:: {driver_emp_no}번 승무원 정보를 찾을 수 없습니다.")
+
+        # iframe_element = driver.find_element(By.ID, "frmReport")
+        # driver.switch_to.frame(iframe_element)
+        driver.execute_script("do_print()")
+
+        try:
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "html")))
+        except TimeoutException:
+            print(f"Timeout:: iframe 정보를 찾을 수 없습니다.")
+            raise Exception(f"Timeout:: iframe 정보를 찾을 수 없습니다.")
+            
+        inner_html_element = driver.find_element(By.TAG_NAME, "html")
+        inner_body_element = driver.find_element(By.TAG_NAME, "body")
+        pop_diag_div = driver.find_element(By.ID, "pop-diagnosis")
+        content_div = driver.find_element(By.ID, "content-01")
+        top_btn = driver.find_element(By.CLASS_NAME, "page-btn").find_element(By.XPATH, "//a[@class='print' and @onclick='do_report()']")
+        top_btn.click()
+
+        time.sleep(1)
+
+        print(driver.page_source)
+        
+        driver.find_element(By.ID, "targetDiv1")
+        driver.find_element(By.TAG_NAME, "div")
+        driver.find_element(By.CLASS_NAME, "report_menu_div")
+        driver.find_element(By.TAG_NAME, "tr")
+        driver.find_element(By.CLASS_NAME, "report_menu_table_td")
+        driver.find_element(By.CLASS_NAME, "report_menu_table_td_div")
+        driver.find_element(By.TAG_NAME, "nobr")
+        report_top_btns = driver.find_elements(By.CLASS_NAME, "report_menu_button")
+
+        for index, report_top_btn in enumerate(report_top_btns):
+            button_html = report_top_btn.get_attribute("outerHTML")
+            if ("저장" in button_html and "PDF 저장" not in button_html):
+                time.sleep(1)
+                report_top_btn.click()
+                time.sleep(1)
+                driver.find_element(By.CLASS_NAME, "report_popup_view")
+                file_box = driver.find_element(By.CLASS_NAME, "report_save_view_position")
+                boxes = file_box.find_elements(By.TAG_NAME, "div")
+                for idx, setting_box in enumerate(boxes):
+                    if idx == 0:
+                        select_element = setting_box.find_element(By.TAG_NAME, "select")
+                        select = Select(select_element)
+                        select.select_by_index(2)
+                    elif idx == 1:
+                        filename_input = setting_box.find_element(By.TAG_NAME, "input")
+                        filename_input.clear()
+                        filename_input.send_keys(driver_emp_no)
+                    else:
+                        break
+                buttons = file_box.find_elements(By.TAG_NAME, "button")
+                for i, button in enumerate(buttons):
+                    if "저장" in button.get_attribute("outerHTML"):                        
+                        button.click()
+                        time.sleep(3)
+                        break
+                break
+    except WebDriverException as e:
+        import traceback
+        traceback.print_exc()
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise
+    
 def get_dangerous_driver_report_list (conn, login_id: str, password: str, year_month: str, company_id: int):
     driver = login(login_id, password)
 

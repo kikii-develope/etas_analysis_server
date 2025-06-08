@@ -14,11 +14,16 @@ def check_jsessionid(driver):
     Returns:
         tuple: (bool, str) - (JSESSIONID 존재 여부, JSESSIONID 값 또는 None)
     """
-    cookies = driver.get_cookies()
-    for cookie in cookies:
-        if cookie['name'] == 'JSESSIONID':
-            return True
-    return False
+    try:
+        cookies = driver.get_cookies()
+        for cookie in cookies:
+            if cookie['name'] == 'JSESSIONID':
+                return True
+        driver.quit()
+        return False
+    except Exception as e:
+        print(e)
+        return False
 
 def check_main_page(driver, main_page_url):
     """

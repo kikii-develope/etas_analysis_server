@@ -21,8 +21,8 @@ def insert_query (table: str, *cols: str) -> str:
 
 # etas 운전자 데이터 불러오기(company_id 필요)
 def fetch_driver_data (cursor, company_id):
-    query = f"SELECT id, emp_no, name FROM driver WHERE company_id = {company_id}"
+    query = f"SELECT id, emp_no, name, company_id FROM etas_driver WHERE company_id = {company_id}"
     cursor.execute(query)
     result = cursor.fetchall()
 
-    return pd.DataFrame(result, columns=["id", "emp_no", "name"])
+    return pd.DataFrame(result, columns=["id", "emp_no", "name", "company_id"])
