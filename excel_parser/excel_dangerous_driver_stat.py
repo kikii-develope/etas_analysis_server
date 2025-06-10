@@ -46,6 +46,7 @@ def upload_etas_dangerous_driver_stats(df: pd.DataFrame, conn, companyId: int, y
                                           row.get("운행정보거리", None), row.get("운행정보시간", None)))
     
     conn.commit()
+    print(conn.cursor().rowcount)
     conn.cursor().close()
     
     return None

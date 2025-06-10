@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 import io
 import os
+import time
 import pandas as pd
 import uvicorn
 from config.environment import get_env
-from crawler.crawler_etas import download_pdf_file, get_dangerous_driver_report_list, init_driver, is_change_password_page, login
+from crawler.crawler_etas import download_pdf_file, download_pdf_files, get_dangerous_driver_report_list, init_driver, is_change_password_page, login
 from crawler.session_utils import check_jsessionid
 from excel_parser.excel_dangerous_driver_stat import upload_etas_dangerous_driver_stats
 from excel_parser.excel_driver_info import upload_etas_driver_data
@@ -25,6 +26,8 @@ async def lifespan(app: FastAPI):
     password = "1733a-sql"
     database = "kiki-dev-v2"
     port = 13307
+
+    
     
     db_conn = connect_to_mysql(host=host, user=user, password=password, database=database, port=port)
     
@@ -46,15 +49,15 @@ app.add_middleware(
 def read_root():
     return {"message": "Hello, World!"}
 
-@app.get("/check-session")
-async def check_jsessionid_api():
-    driver = init_driver()
-    return {"message": "Session checked", "status": 200, "object": check_jsessionid(driver)}
-
 @app.post("/etas-login")
 async def etas_login(req: EtasLoginRequest):
     try:
         driver = await login(req.id, req.password);
+        
+        time.sleep(5)
+        
+        await download_pdf_files(db_conn, driver, req.companyId, req.yearMonth, req.riskLevel)
+        
         return {"message": "Login successful", "status": 200, "object": driver.current_url}
     except Exception as e:
         print(e.with_traceback())
@@ -173,6 +176,7 @@ def main():
     
     # get_dangerous_driver_report_list(conn, "bybus", "**sam00831", "2024-10", 2)
     
-    
+
 if __name__ == "__main__":
+    
     uvicorn.run(app, host="0.0.0.0", port=8000)
