@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+selenium
+pandas
+mysql-connector-python
+openpyxl
+xlrd
+requests
+requests-toolbelt
+python-multipart
+httpx 

@@ -105,9 +105,11 @@ async def find_is_login_symbol (driver):
 
 async def is_change_password_page(driver):
     base_url_regex = "kotsa.or.kr"
-    current_url = driver.current_url
+    try:
+        current_url = driver.current_url
+    except Exception as e:
+        return False
     
-    print(current_url, flush=True)
     if base_url_regex in current_url:
         if "pwrdChange" in current_url: # 비밀번호 변경 페이지인지 확인 후, 메인화면으로 이동.
             driver.execute_script("fnNextChange();")
@@ -122,7 +124,7 @@ async def is_change_password_page(driver):
 def get_dangerous_driver_list (conn, year_month, company_id):
     cursor = conn.cursor()
     
-    query = f"SELECT d.emp_no, dda.* FROM dangerous_driving_stat dda INNER JOIN driver d ON d.id = dda.driver_id WHERE d.company_id = {company_id} AND dda.report_year_month = '{year_month + "-01"}' AND dda.danger_degree = '매우위험'"
+    query = f"SELECT d.emp_no, dda.* FROM dangerous_driving_stat dda INNER JOIN driver d ON d.id = dda.driver_id WHERE d.company_id = {company_id} AND dda.report_year_month = '{year_month}' AND dda.danger_degree = '매우위험'"
     cursor.execute(query)
     
     result = cursor.fetchall()
@@ -139,11 +141,28 @@ async def download_pdf_files(conn, driver, company_id, year_month, risk_level):
     cursor.close()
     df = pd.DataFrame(result, columns=columns)
     
+    response = {
+        "total": len(df),
+        "success": 0,
+        "failed": 0,
+        "existed": 0
+    }
+    
     for index, row in df.iterrows():
         #이미 저장된 종합진단표가 있는 경우 
         if row['file_url'] is not None:
+            response["existed"] += 1
             continue
-        await download_pdf_file(conn, driver, company_id, row['emp_no'], year_month, row['driver_id'])
+        result = await download_pdf_file(conn, driver, company_id, row['emp_no'], year_month, row['driver_id'])
+        if result is None:
+            continue
+        elif result is True:
+            response["success"] += 1
+        else:
+            response["failed"] += 1
+            
+    return response
+            
 
 async def download_pdf_file(conn, driver, company_id, emp_no, year_month, driver_id):
     try:
@@ -229,7 +248,7 @@ async def download_pdf_file(conn, driver, company_id, emp_no, year_month, driver
                         button.click()
                         time.sleep(3)
                         
-                        file_path = os.path.join(download_file_url, f'{driver_emp_no}.pdf')
+                        file_path = os.path.join(download_file_url, f'{sanitize_filename(driver_emp_no)}.pdf')
                         print(file_path)
                             
                         res = await upload_pdf_file(year_month, driver_id, file_path)
@@ -243,23 +262,30 @@ async def download_pdf_file(conn, driver, company_id, emp_no, year_month, driver
                             cursor.execute(query)
                             conn.commit()
                             cursor.close()
+                            
+                            initialize_driver_page(driver)
+                            return True
                         else:
                             print("upload failed")
+                        
                         initialize_driver_page(driver)
-                        return driver
+                        return False
                 
                 initialize_driver_page(driver)
-                return driver
-            
-            
+                return False
+            return None
     except WebDriverException as e:
         import traceback
         traceback.print_exc()
-        raise
+        
+        initialize_driver_page(driver)
+
+        return False
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise
+        initialize_driver_page(driver)
+        return False
 
 #초기 페이지 상태로 돌려놓는 함수.
 def initialize_driver_page(driver):
@@ -304,7 +330,6 @@ async def upload_pdf_file(year_month, driver_id, file_url):
     }
     file_path = file_url  # 실제 파일 경로
     file_name = os.path.basename(file_path)
-    file_name = sanitize_filename(file_name)
     try:
         with open(file_path, "rb") as f:
             files = {

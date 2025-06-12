@@ -56,11 +56,17 @@ async def etas_login(req: EtasLoginRequest):
         
         time.sleep(5)
         
-        await download_pdf_files(db_conn, driver, req.companyId, req.yearMonth, req.riskLevel)
+        result = await download_pdf_files(db_conn, driver, req.companyId, req.yearMonth, req.riskLevel)
         
-        return {"message": "Login successful", "status": 200, "object": driver.current_url}
+        driver.quit()
+        
+        return {"message": "Login successful", "status": 200, "object": result}
     except Exception as e:
         print(e.with_traceback())
+        
+        if driver is not None:
+            driver.quit()
+        
         raise HTTPException(status_code=400, detail={
             "message": "Login failed",
             "error": str(e),
@@ -121,6 +127,7 @@ async def get_etas_driving_data(file: UploadFile = File(...), companyId: int = F
         
         upload_etas_dangerous_driver_stats(df, db_conn, companyId, yearMonth)
         
+        
         return {"message": "Upload successful", "status": 200}
         
     except Exception as e:
@@ -144,6 +151,8 @@ async def download_dangerous_driver_report(requst: Request):
         print(emp_no)
         
         download_pdf_file(db_conn, company_id, emp_no, year_month=year_month)
+        
+        
         
         return {"message": "Download successful", "status": 200}
     except HTTPException as e:
@@ -179,4 +188,4 @@ def main():
 
 if __name__ == "__main__":
     
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=80)
