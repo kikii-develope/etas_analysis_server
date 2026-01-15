@@ -8,6 +8,8 @@
 - 엑셀 데이터 파싱 후 DB 저장
 - FastAPI 기반 API 제공
 
+---
+
 ### 2. 기술 스택
 
 - **Language**: Python 3  
@@ -58,8 +60,9 @@ crawling_driver_data/
 └── data/
     └── *.xls                 # 테스트 및 샘플 엑셀 파일
 ```
+---
 
-### ETAS 계정
+### 3. ETAS 계정
 
 - 삼영
     - sybus
@@ -73,3 +76,62 @@ crawling_driver_data/
 - 덕장
     - dz007
     - dzbus46438@
+
+---
+
+### 4. API 목록
+
+### 4.2 ETAS 크롤러
+
+#### `crawler/crawler_etas.py`
+- `login(driver, user_id, password)`
+  - Selenium을 이용한 ETAS 웹 로그인 수행
+- `is_change_password_page(driver)`
+  - 비밀번호 변경 페이지 노출 여부 확인
+- `get_dangerous_driver_list(driver)`
+  - ETAS 시스템 내 위험 운전자 목록 조회
+- `download_pdf_files(conn, driver, company_id, year_month, risk_level)`
+  - 월별 위험 운전자 리포트 PDF 다운로드
+- `initialize_driver_page(driver)`
+  - 웹 드라이버를 초기 상태로 초기화 하는 함수
+
+---
+
+### 4.3 크롤러 제어 로직
+
+#### `crawler/index.py`
+- `get_default_download_path()`
+  - 웹 드라이버에서 파일이 다운로드 될 위치를 리턴하는 함수.
+- `load_web_driver(user_data_dir)`
+  - 웹 드라이버 불러오는 함수
+  - user_data_dir: 저장경로 지정 함수.
+
+---
+
+### 4.4 세션 관리
+
+#### `crawler/session_utils.py`
+- `check_jsessionid(driver)`
+  - 로그인 세션(JSESSIONID) 유효성 검사
+- `check_main_page(driver, main_page_url)`
+  - ETAS 메인페이지에 접근이 가능한 지 확인하는 함수
+
+---
+
+### 4.5 엑셀 파서
+
+#### `excel_parser/excel_driver_info.py`
+- `upload_etas_driver_data(df, conn, companyId)`
+  - ETAS 운전자 정보 스운솔 업로드 API
+
+#### `excel_parser/excel_dangerous_driver_stat.py`
+- `upload_etas_dangerous_driver_stats(df, conn, companyId, yearMonth)`
+  - ETAS에서 뽑은 위험운전 통계 엑셀 데이터를 스운솔에 업로드하는 함수
+
+---
+
+### 5. 실제 업무 프로세스
+
+### 6. 시스템 구조
+
+### 7. 유의사항
