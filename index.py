@@ -26,8 +26,12 @@ async def lifespan(app: FastAPI):
     password = "1733a-sql"
     database = "kiki-dev-v2"
     port = 13307
-
     
+    # host = "211.233.58.23"
+    # user = "kikii"
+    # password = "mysql-1733"
+    # database = "deploy-kikib-v2"
+    # port = 3306
     
     db_conn = connect_to_mysql(host=host, user=user, password=password, database=database, port=port)
     
@@ -126,7 +130,7 @@ async def get_etas_driving_data(file: UploadFile = File(...), companyId: int = F
             })
         
         upload_etas_dangerous_driver_stats(df, db_conn, companyId, yearMonth)
-        
+        d
         
         return {"message": "Upload successful", "status": 200}
         
@@ -171,11 +175,17 @@ def main():
     # env = get_env()
     # print(env)
     
-    host = "168.126.147.134"
-    user = "root"
-    password = "1733a-sql"
-    database = "kiki-dev-v2"
-    port = 13307
+    # host = "168.126.147.134"
+    # user = "root"
+    # password = "1733a-sql"
+    # database = "kiki-dev-v2"
+    # port = 13307
+    
+    # host = "211.233.58.23"
+    # user = "kikii"
+    # password = "mysql-1733"
+    # database = "deploy-kikib-v2"
+    # port = 3306
     
     conn = connect_to_mysql(host=host, user=user, password=password, database=database, port=port)
     
@@ -188,4 +198,4 @@ def main():
 
 if __name__ == "__main__":
     
-    uvicorn.run(app, host="0.0.0.0", port=80)
+    uvicorn.run(app, host="0.0.0.0", port=8888)

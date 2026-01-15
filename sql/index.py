@@ -11,6 +11,7 @@ def connect_to_mysql(host: str, user: str, password: str, database: str, port: i
             port=port
         )
         print("✅ MySQL 연결 성공")
+        print(conn._host)
         return conn
     except mysql.connector.Error as e:
         print(f"❌ MySQL 연결 실패: {e}")

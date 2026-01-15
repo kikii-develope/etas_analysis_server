@@ -19,7 +19,6 @@ import requests
 
 def start_driver(user_data_dir: str = None):
     driver = load_web_driver(user_data_dir)
-    print("new Driver Started")
     return driver
 
 def init_driver():
@@ -181,6 +180,8 @@ async def download_pdf_file(conn, driver, company_id, emp_no, year_month, driver
         driver.execute_script(f"window.open('{url}', '_blank');")
         time.sleep(2)
         driver.switch_to.window(driver.window_handles[1])
+    
+        print(url)
         
         frmElement = driver.find_element(By.ID, "frmReport")
         
@@ -243,9 +244,11 @@ async def download_pdf_file(conn, driver, company_id, emp_no, year_month, driver
                     else:
                         break
                 buttons = file_box.find_elements(By.TAG_NAME, "button")
+                
+                
                 for i, button in enumerate(buttons):
-                    if "저장" in button.get_attribute("outerHTML"):                        
-                        button.click()
+                    if "저장" in button.get_attribute("outerHTML"):
+                        WebDriverWait(driver, 10).until(EC.element_to_be_clickable(button)).click()
                         time.sleep(3)
                         
                         file_path = os.path.join(download_file_url, f'{sanitize_filename(driver_emp_no)}.pdf')

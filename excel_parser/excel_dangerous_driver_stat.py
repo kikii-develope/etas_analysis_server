@@ -21,9 +21,6 @@ def upload_etas_dangerous_driver_stats(df: pd.DataFrame, conn, companyId: int, y
         lambda x: re.sub(r"[\s\n\r]", "", re.sub(r"\s*\([^)]*\)\s*", "", x))
     )
     
-    print("columns!!")
-    print(df.columns)
-    
     for _, row in df.iterrows():
         selected_driver_id = row['코드']
         selected_driver = driver_df[driver_df["emp_no"] == selected_driver_id]
